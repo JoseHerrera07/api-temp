@@ -10,13 +10,9 @@ const PUERTO = 3001;
 app.use(cors());
 app.use(express.static(path.join(__dirname))); 
 
-// --- BASE DE DATOS (Tu archivo de memoria eterna) ---
-const db = new sqlite3.Database('./historial.db', (err) => {
-    if (err) console.error("Error DB:", err.message);
-    else console.log("💾 Memoria lista: historial.db");
-});
+// --- BASE DE DATOS ---
+const db = new sqlite3.Database('./historial.db');
 
-// Tabla unificada
 db.run(`CREATE TABLE IF NOT EXISTS mediciones (
     fecha TEXT,
     hora TEXT,
@@ -30,18 +26,18 @@ db.run(`CREATE TABLE IF NOT EXISTS mediciones (
 const ID_EJECUTADA = 6;  
 const ID_PROGRAMADA = 3; 
 
-// --- HERRAMIENTAS DE TIEMPO ---
+// --- HERRAMIENTAS ---
 function obtenerFechaHoy() {
-    const hoy = new Date();
-    const yyyy = hoy.getFullYear();
-    const mm = String(hoy.getMonth() + 1).padStart(2, '0');
-    const dd = String(hoy.getDate()).padStart(2, '0');
+    const d = new Date();
+    // Ajuste de zona horaria Perú (UTC-5) simple
+    const peruTime = new Date(d.toLocaleString("en-US", {timeZone: "America/Lima"}));
+    const yyyy = peruTime.getFullYear();
+    const mm = String(peruTime.getMonth() + 1).padStart(2, '0');
+    const dd = String(peruTime.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
 }
 
-// Convierte "h1" -> "00:00", "h2" -> "00:30"...
 function keyHoraAFormatoVisual(hKey) {
-    // h1 es 00:00, h2 es 00:30
     const numeroBloque = parseInt(hKey.replace('h', ''));
     const minutosTotales = (numeroBloque - 1) * 30;
     const horas = Math.floor(minutosTotales / 60);
@@ -49,143 +45,128 @@ function keyHoraAFormatoVisual(hKey) {
     return `${horas.toString().padStart(2,'0')}:${mins.toString().padStart(2,'0')}`;
 }
 
-function obtenerHoraActual() {
-    const ahora = new Date();
-    const min = ahora.getMinutes() < 30 ? "00" : "30";
-    return `${ahora.getHours().toString().padStart(2,'0')}:${min}`;
-}
-
-// --- LÓGICA COES MASIVA (EL CAMBIO IMPORTANTE) ---
-async function descargarYGuardarDiaCompletoCOES() {
-    const fecha = obtenerFechaHoy();
+// --- LOGICA COES (Detecta futuro y pone NULL) ---
+async function sincronizarCOES(fechaSolicitada) {
+    console.log(`⚡ Procesando COES para: ${fechaSolicitada}`);
+    const hoy = obtenerFechaHoy();
+    const esHoy = (fechaSolicitada === hoy);
     
-    // Función interna para traer los datos crudos
+    // Calcular bloque actual (1 a 48)
+    const ahora = new Date();
+    const minutosDia = (ahora.getHours() * 60) + ahora.getMinutes();
+    const bloqueActual = Math.floor(minutosDia / 30) + 1;
+
     const traerDatos = async (id) => {
         try {
-            const url = `https://appserver.coes.org.pe/waMediciones/api/Mediciones?lectcodi=${id}&fechaIni=${fecha}&fechaFin=${fecha}`;
+            const url = `https://appserver.coes.org.pe/waMediciones/api/Mediciones?lectcodi=${id}&fechaIni=${fechaSolicitada}&fechaFin=${fechaSolicitada}`;
             const resp = await axios.get(url);
             return resp.data.listMediciones || resp.data || [];
         } catch (e) { return []; }
     };
 
-    console.log("📥 Descargando historial del COES...");
     const [listaReal, listaProg] = await Promise.all([
         traerDatos(ID_EJECUTADA),
         traerDatos(ID_PROGRAMADA)
     ]);
 
-    // Recorremos las 48 horas (h1 ... h48)
-    for (let i = 1; i <= 48; i++) {
-        const key = `h${i}`;
-        const horaVisual = keyHoraAFormatoVisual(key);
-
-        // Sumar todas las plantas para esta hora específica
-        let sumaReal = 0;
-        let sumaProg = 0;
-        let hayDatosReal = false;
-
-        if (Array.isArray(listaReal)) {
-            listaReal.forEach(item => {
-                if (item[key] !== null) {
-                    sumaReal += parseFloat(item[key] || 0);
-                    hayDatosReal = true;
-                }
-            });
-        }
-
-        if (Array.isArray(listaProg)) {
-            listaProg.forEach(item => sumaProg += parseFloat(item[key] || 0));
-        }
-
-        // SOLO GUARDAMOS SI HAY DATOS (Para no llenar la DB de ceros del futuro)
-        // La programada siempre se guarda porque es una predicción futura
-        if (hayDatosReal || sumaProg > 0) {
-            // TRUCO: Usamos COALESCE para no borrar la temperatura si ya estaba guardada
-            // Si temp es NULL, mantén el valor viejo.
-            const sql = `
-                INSERT INTO mediciones (fecha, hora, demanda_real, demanda_prog, temp, hum) 
-                VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT(fecha, hora) DO UPDATE SET
-                demanda_real = excluded.demanda_real,
-                demanda_prog = excluded.demanda_prog
-            `;
+    db.serialize(() => {
+        db.run("BEGIN TRANSACTION");
+        for (let i = 1; i <= 48; i++) {
+            const key = `h${i}`;
+            const horaVisual = keyHoraAFormatoVisual(key);
             
-            // Nota: Para temp/hum ponemos null aquí porque el COES no sabe de clima.
-            // La base de datos mantendrá el clima si ya existía gracias al UPDATE selectivo.
-            db.run(sql, [fecha, horaVisual, sumaReal, sumaProg, null, null], (err) => {
-                if (err) console.error("Error guardando COES:", err.message);
-            });
+            let sumaReal = 0;
+            let sumaProg = 0;
+            let hayDatoReal = false;
+
+            if (Array.isArray(listaReal)) {
+                listaReal.forEach(item => {
+                    const val = parseFloat(item[key]);
+                    if (!isNaN(val)) { sumaReal += val; hayDatoReal = true; }
+                });
+            }
+            if (Array.isArray(listaProg)) {
+                listaProg.forEach(item => sumaProg += parseFloat(item[key] || 0));
+            }
+
+            // MAGIA: Si es HOY y el bloque es futuro, forzamos NULL en la real
+            let valorRealFinal = (hayDatoReal && sumaReal > 0) ? sumaReal : null;
+            if (esHoy && i > bloqueActual) {
+                valorRealFinal = null; 
+            }
+
+            // Guardar en DB si hay algo útil
+            if (valorRealFinal !== null || sumaProg > 0) {
+                const sql = `
+                    INSERT INTO mediciones (fecha, hora, demanda_real, demanda_prog, temp, hum) 
+                    VALUES (?, ?, ?, ?, NULL, NULL)
+                    ON CONFLICT(fecha, hora) DO UPDATE SET
+                    demanda_real = excluded.demanda_real,
+                    demanda_prog = excluded.demanda_prog
+                `;
+                db.run(sql, [fechaSolicitada, horaVisual, valorRealFinal, sumaProg]);
+            }
         }
-    }
-    console.log("✅ Historial COES sincronizado en DB.");
+        db.run("COMMIT");
+    });
 }
 
-// --- LÓGICA CLIMA (EN VIVO) ---
-async function guardarClimaActual() {
-    const fecha = obtenerFechaHoy();
-    const hora = obtenerHoraActual();
-
+// --- LOGICA CLIMA (Historial 24h) ---
+async function sincronizarClima(fechaSolicitada) {
+    console.log(`🌤️ Procesando Clima para: ${fechaSolicitada}`);
     try {
-        const url = "https://api.open-meteo.com/v1/forecast?latitude=-12.0464&longitude=-77.0428&current=temperature_2m,relative_humidity_2m&timezone=auto";
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=-12.0464&longitude=-77.0428&hourly=temperature_2m,relative_humidity_2m&timezone=auto&start_date=${fechaSolicitada}&end_date=${fechaSolicitada}`;
         const resp = await axios.get(url);
-        const temp = resp.data.current.temperature_2m;
-        const hum = resp.data.current.relative_humidity_2m;
-
-        // Aquí al revés: Actualizamos clima, no tocamos COES
-        const sql = `
-            INSERT INTO mediciones (fecha, hora, temp, hum, demanda_real, demanda_prog) 
-            VALUES (?, ?, ?, ?, 0, 0)
-            ON CONFLICT(fecha, hora) DO UPDATE SET
-            temp = excluded.temp,
-            hum = excluded.hum
-        `;
         
-        db.run(sql, [fecha, hora, temp, hum]);
-        console.log(`🌤️ Clima guardado: ${hora} -> ${temp}°C`);
-    } catch (e) { console.error("Error Clima"); }
+        if(!resp.data.hourly) return;
+        const hourly = resp.data.hourly;
+
+        db.serialize(() => {
+            db.run("BEGIN TRANSACTION");
+            for (let i = 0; i < hourly.time.length; i++) {
+                // Formato ISO: "2023-01-01T14:00"
+                const horaPura = hourly.time[i].split('T')[1]; 
+                const [hh, mm] = horaPura.split(':');
+                
+                const temp = hourly.temperature_2m[i];
+                const hum = hourly.relative_humidity_2m[i];
+
+                const sql = `
+                    INSERT INTO mediciones (fecha, hora, temp, hum, demanda_real, demanda_prog) 
+                    VALUES (?, ?, ?, ?, NULL, NULL)
+                    ON CONFLICT(fecha, hora) DO UPDATE SET
+                    temp = excluded.temp,
+                    hum = excluded.hum
+                `;
+                
+                // Guardamos para las XX:00 y las XX:30
+                db.run(sql, [fechaSolicitada, `${hh}:00`, temp, hum]);
+                db.run(sql, [fechaSolicitada, `${hh}:30`, temp, hum]);
+            }
+            db.run("COMMIT");
+        });
+    } catch (e) { console.error("Error Clima:", e.message); }
 }
 
-
-// --- RUTAS ---
-
-// 1. Sincronizar: Se llama desde el frontend cada 5 min
-app.get('/api/sincronizar', async (req, res) => {
-    // Disparamos las descargas (sin esperar a que terminen para responder rápido)
-    await guardarClimaActual();
-    await descargarYGuardarDiaCompletoCOES();
-
-    const fecha = obtenerFechaHoy();
+// --- RUTA API UNIFICADA ---
+app.get('/api/datos', async (req, res) => {
+    const fecha = req.query.fecha || obtenerFechaHoy();
     
-    // Leemos la DB y la enviamos al frontend
+    // Intentamos actualizar datos (si falla, leemos lo que haya en caché)
+    try {
+        await Promise.all([
+            sincronizarCOES(fecha),
+            sincronizarClima(fecha)
+        ]);
+    } catch (e) { console.log("Usando caché DB..."); }
+
     db.all(`SELECT * FROM mediciones WHERE fecha = ? ORDER BY hora ASC`, [fecha], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
-        
-        // Limpiamos los nulls de la DB para que el JSON vaya limpio
-        const datosLimpios = rows.map(r => ({
-            hora: r.hora,
-            temp: r.temp,            // Si es null, el frontend lo manejará
-            hum: r.hum,
-            demanda_real: r.demanda_real,
-            demanda_prog: r.demanda_prog
-        }));
-
-        res.json({ ok: true, datos: datosLimpios });
+        res.json({ ok: true, fecha: fecha, datos: rows });
     });
 });
 
-// 2. Ruta para ver historial pasado (para cuando pongas los botones de fechas)
-app.get('/api/historial/:fecha', (req, res) => {
-    const fecha = req.params.fecha; // formato YYYY-MM-DD
-    db.all(`SELECT * FROM mediciones WHERE fecha = ? ORDER BY hora ASC`, [fecha], (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ ok: true, datos: rows });
-    });
-});
-
-// Arrancar
 app.listen(PUERTO, () => {
-    console.log(`🚀 SERVIDOR LISTO: http://localhost:${PUERTO}`);
-    // Al prender, hacemos una carga inicial inmediata
-    descargarYGuardarDiaCompletoCOES();
-    guardarClimaActual();
+    console.log(`🚀 SERVIDOR OK: http://localhost:${PUERTO}`);
+    console.log(`📅 Fecha servidor: ${obtenerFechaHoy()}`);
 });

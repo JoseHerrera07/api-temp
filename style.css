@@ -1,112 +1,119 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&display=swap');
-
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
 * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
 body { background-color: #f4f6f9; color: #333; height: 100vh; padding: 20px; }
+.dashboard-container { display: grid; grid-template-columns: 250px 1fr; gap: 20px; height: calc(100vh - 40px); max-width: 1800px; margin: 0 auto; }
 
-/* LAYOUT PRINCIPAL */
-.dashboard-container {
-    display: grid;
-    grid-template-columns: 240px 1fr;
-    gap: 20px;
-    height: calc(100vh - 40px);
-    max-width: 1600px;
-    margin: 0 auto;
-}
+.sidebar { display: flex; flex-direction: column; gap: 20px; }
+.brand { display: flex; align-items: center; gap: 10px; color: #2c3e50; margin-bottom: 5px; }
+.brand h2 { font-size: 1.2rem; font-weight: 700; }
 
-/* SIDEBAR */
-.sidebar { display: flex; flex-direction: column; gap: 20px; height: 100%; }
-.brand { display: flex; align-items: center; gap: 10px; color: #2c3e50; margin-bottom: 10px; }
-.info-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-.active-card { border-left: 4px solid #3498db; background-color: #f8fbff; }
-.card-header { display: flex; align-items: center; gap: 8px; color: #7f8c8d; font-size: 0.9rem; margin-bottom: 10px; }
-.card-body h3 { font-size: 2rem; color: #2c3e50; }
-.status-bar { background: #eee; padding: 10px; border-radius: 8px; font-size: 0.8rem; text-align: center; color: #666; }
-.btn-reset { width: 100%; padding: 12px; border: none; background: #ffecec; color: #e74c3c; border-radius: 8px; cursor: pointer; font-weight: 600; display: flex; align-items: center; justify-content: center; gap:5px; transition: 0.2s; }
-.btn-reset:hover { background: #e74c3c; color: white; }
+.date-selector { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+.date-selector label { display: block; font-size: 0.8rem; font-weight: 600; color: #7f8c8d; margin-bottom: 5px; }
+.date-selector input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; color: #2c3e50; }
 
-/* MAIN CONTENT */
-.main-content { display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
+.info-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border-left: 4px solid #ddd; }
+#card-temp { border-left-color: #f1c40f; }
+#card-energy { border-left-color: #8e44ad; }
+.card-header { display: flex; align-items: center; gap: 8px; color: #7f8c8d; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px; }
+.card-body h3 { font-size: 1.8rem; color: #2c3e50; }
+.status-bar { background: #e0e0e0; padding: 8px; border-radius: 6px; font-size: 0.75rem; text-align: center; color: #555; margin-top: auto; }
 
-/* Date Navigator */
-.date-navigator { background: white; padding: 15px; border-radius: 12px; display: flex; align-items: center; gap: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
-.date-buttons-list { display: flex; gap: 8px; overflow-x: auto; }
-.date-btn { padding: 6px 14px; border: 1px solid #e0e0e0; background: white; border-radius: 6px; cursor: pointer; transition: 0.2s; }
-.date-btn.active { background: #2c3e50; color: white; border-color: #2c3e50; }
+.main-content { display: flex; flex-direction: column; gap: 20px; overflow-y: hidden; }
+.charts-row { display: flex; gap: 20px; height: 60%; }
+.chart-box { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 15px rgba(0,0,0,0.06); display: flex; flex-direction: column; }
+.main-chart { flex: 3; }
+.peaks-box { flex: 1; min-width: 240px; overflow-y: auto; }
+.chart-header h4 { margin-bottom: 10px; color: #34495e; font-size: 1rem; }
+.canvas-wrapper { flex-grow: 1; position: relative; width: 100%; min-height: 0; }
 
-/* --- FILA DE GRÁFICOS (NUEVO) --- */
-.charts-row {
-    display: flex;
-    gap: 20px;
-    height: 380px; /* Altura fija para la fila */
-}
+.peaks-grid { display: grid; grid-template-rows: repeat(4, 1fr); gap: 10px; height: 100%; }
+.peak-item { display: flex; align-items: center; padding: 10px; border-radius: 8px; background: #f8f9fa; border-left: 4px solid transparent; }
+.peak-icon { font-size: 2rem; margin-right: 12px; }
+.peak-info { display: flex; flex-direction: column; }
+.peak-label { font-size: 0.7rem; color: #95a5a6; font-weight: 600; text-transform: uppercase; }
+.peak-value { font-size: 1.1rem; font-weight: 700; color: #2c3e50; }
+.peak-time { font-size: 0.7rem; color: #95a5a6; }
 
-.chart-box {
-    background: white; padding: 20px; border-radius: 12px; 
-    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-    display: flex; flex-direction: column;
-}
+/* Colores Solicitados */
+.border-temp { border-color: #f1c40f; background: #fffbf0; } .icon-temp { color: #f1c40f; }
+.border-hum { border-color: #3498db; background: #f0f7fb; } .icon-hum { color: #3498db; }
+.border-real { border-color: #8e44ad; background: #fbf4ff; } .icon-real { color: #8e44ad; }
+.border-prog { border-color: #e57373; background: #fff5f5; } .icon-prog { color: #e57373; }
 
-/* El gráfico principal ocupa el espacio disponible */
-.main-chart { flex: 2; } 
-
-/* El gauge ocupa un ancho fijo a la derecha */
-.gauge-box { 
-    flex: 1; 
-    min-width: 300px;
-    align-items: center;
-    position: relative;
-}
-
-.chart-header h4 { color: #2c3e50; font-size: 1rem; margin-bottom: 15px; text-align: center; }
-.canvas-wrapper { flex-grow: 1; position: relative; width: 100%; }
-
-/* --- ESTILOS DEL GAUGE (VELOCÍMETRO) --- */
-.gauge-container {
-    position: relative;
-    width: 220px;
-    height: 110px; /* Mitad de un círculo */
-    margin-top: 20px;
-}
-
-/* La Aguja */
-.needle {
-    width: 100px;
-    height: 4px;
-    background: #2c3e50;
-    position: absolute;
-    bottom: 0; /* Base del semicírculo */
-    left: 10px; /* Ajuste para centrar el eje de rotación */
-    transform-origin: 100% 50%; /* Rota desde la derecha (el centro del reloj) */
-    transform: rotate(0deg); /* Se controla con JS */
-    transition: transform 1s cubic-bezier(0.4, 2, 0.55, 0.44); /* Efecto rebote suave */
-    border-radius: 50% 0 0 50%;
-    z-index: 10;
-}
-
-.needle-center {
-    width: 16px;
-    height: 16px;
-    background: #2c3e50;
-    border-radius: 50%;
-    position: absolute;
-    bottom: -8px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 11;
-}
-
-.gauge-info { text-align: center; margin-top: 20px; }
-.gauge-info h2 { font-size: 2.2rem; color: #2c3e50; font-weight: 800; }
-.gauge-info p { color: #e74c3c; font-weight: 600; font-size: 0.95rem; }
-
-/* TABLA */
-.table-container { background: white; padding: 15px; border-radius: 12px; max-height: 300px; overflow-y: auto; }
+.table-container { background: white; padding: 0; border-radius: 12px; flex-grow: 1; overflow-y: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
 table { width: 100%; border-collapse: collapse; }
-th, td { padding: 12px; text-align: center; border-bottom: 1px solid #eee; font-size: 0.9rem; }
-th { background: #f8f9fa; position: sticky; top: 0; }
+th, td { padding: 10px; text-align: center; border-bottom: 1px solid #eee; font-size: 0.85rem; }
+th { background: #f8f9fa; color: #7f8c8d; position: sticky; top: 0; }
 
+/* =========================================
+   VERSION MÓVIL 
+   ========================================= */
 @media (max-width: 900px) {
-    .dashboard-container { grid-template-columns: 1fr; height: auto; }
-    .charts-row { flex-direction: column; height: auto; }
-    .gauge-container { margin: 0 auto; }
+    body {
+        padding: 10px;
+        height: auto; /* Permitir scroll infinito en celular */
+        overflow-y: auto;
+    }
+
+    .dashboard-container {
+        display: flex;
+        flex-direction: column; /* Apilar todo verticalmente */
+        height: auto;
+        max-width: 100%;
+    }
+
+    /* 1. Sidebar se vuelve cabecera */
+    .sidebar {
+        width: 100%;
+        gap: 10px;
+    }
+
+    /* Opcional: Poner las tarjetas de clima/energía en fila */
+    .info-card {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    /* 2. Gráficos apilados */
+    .charts-row {
+        flex-direction: column; /* Uno debajo del otro */
+        height: auto;
+    }
+
+    .main-chart {
+        height: 350px; /* Altura fija para que se vea bien el gráfico */
+        min-height: 350px;
+    }
+
+    .peaks-box {
+        height: auto;
+        min-height: auto;
+    }
+
+    /* 3. Los cuadritos de picos en 2 columnas (2x2) */
+    .peaks-grid {
+        grid-template-rows: auto;
+        grid-template-columns: 1fr 1fr; 
+        height: auto;
+    }
+
+    .peak-item {
+        padding: 10px;
+    }
+
+    .peak-icon {
+        font-size: 1.5rem; /* Icono un poco más chico */
+        margin-right: 8px;
+    }
+
+    .peak-value {
+        font-size: 1rem;
+    }
+
+    /* 4. Tabla con scroll */
+    .table-container {
+        max-height: 300px;
+        overflow-x: auto; /* Scroll horizontal si la tabla es muy ancha */
+    }
 }

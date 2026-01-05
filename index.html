@@ -3,103 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitor Clima & Energía</title>
+    <title>Monitor Ejecutivo Energía</title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
     <div class="dashboard-container">
-        
         <aside class="sidebar">
             <div class="brand">
                 <span class="material-icons-round">analytics</span>
                 <h2>MONITOR PERÚ</h2>
             </div>
 
-            <div class="info-card active-card">
+            <div class="date-selector">
+                <label>Seleccionar Fecha:</label>
+                <input type="date" id="fecha-input">
+            </div>
+            
+            <div class="info-card" id="card-temp">
                  <div class="card-header">
-                    <span class="material-icons-round" style="color: #3498db;">thermostat</span>
-                    <span>Clima Lima</span>
-                </div>
+                    <span class="material-icons-round" style="color: #f1c40f;">thermostat</span>
+                    <span>Clima</span>
+                 </div>
                  <div class="card-body">
-                    <h3 id="actual-temp">-- °C</h3>
-                    <p id="actual-hum">-- % Humedad</p>
-                    <p id="actual-hora" style="margin-top:5px; font-weight: bold; font-size: 0.8rem;">--:--</p>
+                    <h3 id="actual-temp">--°C</h3>
+                    <p id="actual-hum" style="color: #3498db;">--%</p>
                  </div>
             </div>
 
-            <div class="info-card" style="border-left: 4px solid #8e44ad;">
+            <div class="info-card" id="card-energy">
                 <div class="card-header">
-                   <span class="material-icons-round" style="color: #8e44ad;">bolt</span>
-                   <span>Red Eléctrica (COES)</span>
-               </div>
+                    <span class="material-icons-round" style="color: #8e44ad;">bolt</span>
+                    <span>Demanda</span>
+                </div>
                 <div class="card-body">
-                   <h3 id="coes-valor" style="color: #8e44ad;">-- MW</h3>
-                   <p id="coes-hora" style="font-size: 0.8rem;">Sincronizando...</p>
+                    <h3 id="coes-valor" style="color: #8e44ad;">-- MW</h3>
+                    <div id="coes-hora" style="font-size:0.8rem; color:#666;">--:--</div>
                 </div>
            </div>
-            
-            <div class="status-bar" id="status">
-                Iniciando sistema...
-            </div>
-            
-            <div style="margin-top: auto;">
-                 <button onclick="borrarHistorial()" class="btn-reset">
-                    <span class="material-icons-round">delete_outline</span> Reiniciar Datos
-                </button>
-            </div>
+
+            <div class="status-bar" id="status">Iniciando...</div>
         </aside>
 
         <main class="main-content">
-            
-            <div class="date-navigator">
-                <span style="color: #666; font-weight: 600;">Historial:</span>
-                <div id="date-buttons-container" class="date-buttons-list"></div>
-            </div>
-
             <div class="charts-row">
                 <div class="chart-box main-chart">
-                    <div class="chart-header">
-                        <h4>Variación Diaria (Clima)</h4>
-                    </div>
-                    <div class="canvas-wrapper">
-                        <canvas id="graficoClima"></canvas>
-                    </div>
+                    <div class="chart-header"><h4>Curva de Operación</h4></div>
+                    <div class="canvas-wrapper"><canvas id="graficoClima"></canvas></div>
                 </div>
-
-                <div class="chart-box gauge-box">
-                    <div class="chart-header" style="justify-content: center;">
-                        <h4>Temp. Máxima</h4>
-                    </div>
-                    <div class="gauge-container">
-                        <canvas id="graficoGauge"></canvas>
-                        <div id="gauge-needle" class="needle"></div>
-                        <div class="needle-center"></div>
-                    </div>
-                    <div class="gauge-info">
-                        <h2 id="gauge-valor">-- °C</h2>
-                        <p id="gauge-hora">Calculando...</p>
-                    </div>
+                <div class="chart-box peaks-box">
+                    <div class="chart-header"><h4>Resumen de Picos</h4></div>
+                    <div class="peaks-grid" id="peaks-container"></div>
                 </div>
             </div>
 
              <div class="table-container">
                 <table>
                     <thead>
-                        <tr>
-                            <th>Hora</th>
-                            <th>Temperatura</th>
-                            <th>Humedad</th>
-                        </tr>
+                        <tr><th>Hora</th><th>Temp</th><th>Hum</th><th>Real</th><th>Prog</th></tr>
                     </thead>
                     <tbody id="tabla-datos-dia"></tbody>
                 </table>
             </div>
-
         </main>
     </div>
-
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="app.js"></script>
 </body>
